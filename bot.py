@@ -1,19 +1,22 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 import os
-os.chdir(os.path.dirname(os.path.realpath(__file__)))
-import telebot
-import re
-import argparse
-import logger
-import requests.exceptions
-from ASFConnector import ASFConnector
 
+os.chdir(os.path.dirname(os.path.realpath(__file__)))
+import argparse
+import re
+
+import requests.exceptions
+import telebot
+
+import logger
+from ASFConnector import ASFConnector
 
 _REGEX_CDKEY = re.compile('\w{5}-\w{5}-\w{5}')
 _REGEX_COMMAND_BOT_ARGS = '^[/!]\w+\s*(?P<bot>\w+)?\s+(?P<arg>.*)'
 _REGEX_COMMAND_RAW = '^[/!](?P<input>(?P<command>\w+).*)'
 _REGEX_COMMAND = '^[/!]\w+\s*(?P<bot>\w+)?'
+_ENV_TELEGRAM_API_HOST = "TELEGRAM_API_HOST"
 _ENV_TELEGRAM_BOT_TOKEN = "TELEGRAM_BOT_TOKEN"
 _ENV_TELEGRAM_USER_ALIAS = "TELEGRAM_USER_ALIAS"
 _ENV_ASF_IPC_HOST = "ASF_IPC_HOST"
@@ -29,6 +32,7 @@ parser.add_argument("-v", "--verbosity", help="Defines log verbosity",
 parser.add_argument("--host", help="ASF IPC host. Default: 127.0.0.1", default='127.0.0.1')
 parser.add_argument("--port", help="ASF IPC port. Default: 1242", default='1242')
 parser.add_argument("--password", help="ASF IPC password.", default=None)
+parser.add_argument("--tg_host", help="Telegram API host. Default: api.telegram.org", default="api.telegram.org")
 parser.add_argument("--token", type=str,
                     help="Telegram API token given by @botfather.", default=None)
 parser.add_argument("--alias", type=str, help="Telegram alias of the bot owner.", default=None)
@@ -68,6 +72,12 @@ except KeyError as key_error:
     if not args.password:
         LOG.debug("No IPC Password provided.")
     pass
+try:
+    args.tg_host = os.environ[_ENV_TELEGRAM_API_HOST]
+except KeyError as key_error:
+    if not args.tg_host:
+        LOG.debug("No Telegram API Host provided.")
+    pass
 
 # Sanitize input
 if args.alias[0] == '@':
@@ -77,10 +87,13 @@ args.token = args.token.strip()
 args.alias = args.alias.strip()
 args.host = args.host.strip()
 args.port = args.port.strip()
+args.tg_host = args.tg_host.strip()
+
 if args.password:
     args.password = args.password.strip()
 
 LOG.info("Starting up bot...")
+LOG.debug("Telegram api host: %s", args.tg_host)
 LOG.debug("Telegram token: %s", args.token)
 LOG.debug("User alias: %s", args.alias)
 LOG.debug("ASF IPC host: %s", args.host)
@@ -98,6 +111,8 @@ except Exception as e:
     LOG.critical("Couldn't communicate with ASF. Host: '%s' Port: '%s' \n %s",
                  args.host, args.port, str(e))
     exit(1)
+telebot.apihelper.API_URL = f"https://{args.tg_host}/bot{{0}}/{{1}}"
+LOG.debug(f"TG SET HOST: {telebot.apihelper.API_URL}")
 
 bot = telebot.TeleBot(args.token)
 
